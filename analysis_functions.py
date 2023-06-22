@@ -38,9 +38,14 @@ def load_em_unis() -> tuple[dict[str, list[mda.Universe]], dict[str, list[int]]]
     """
     will load mda unis of all em analyses so far
     Not so space intensive since I don't save this to memory with mda
-    will return a dict with the key being the uni name and the values being a list of the replicas starting with 1
-    for now, protonly and TPR which means that numbering is incorrect, you'll have to add 21
-    Note that each simulation is a different length. A dict of this information is also returned
+    will return a dict with the key being the uni name and the values
+    being a list of the replicas starting with 1
+
+    for now, protonly and TPR
+    which means that numbering is incorrect, you'll have to add 21
+
+    Note that each simulation is a different length.
+    A dict of this information is also returned
     """
 
     all_uni = {}
@@ -103,14 +108,14 @@ def load_em_unis() -> tuple[dict[str, list[mda.Universe]], dict[str, list[int]]]
 
     all_uni[sims.PfHT_MMV12] = uni_wt_mmv12
     all_len[sims.PfHT_MMV12] = len_wt_mmv12
-    all_uni["W412A_MMV12"] = uni_w412a_mmv12
-    all_len["W412A_MMV12"] = len_w412a_mmv12
-    all_uni["PfHT_MMV8"] = uni_wt_mmv8
-    all_len["PfHT_MMV8"] = len_wt_mmv8
-    all_uni["GLUT1_MMV12"] = uni_glut1_mmv12
-    all_len["GLUT1_MMV12"] = len_glut1_mmv12
-    all_uni["PfHT_apo"] = uni_wt_apo
-    all_len["PfHT_apo"] = len_wt_apo
+    all_uni[sims.W4126_MMV12] = uni_w412a_mmv12
+    all_len[sims.W4126_MMV12] = len_w412a_mmv12
+    all_uni[sims.PfHT_MMV8] = uni_wt_mmv8
+    all_len[sims.PfHT_MMV8] = len_wt_mmv8
+    all_uni[sims.GLUT1_MMV12] = uni_glut1_mmv12
+    all_len[sims.GLUT1_MMV12] = len_glut1_mmv12
+    all_uni[sims.PfHT_apo] = uni_wt_apo
+    all_len[sims.PfHT_apo] = len_wt_apo
 
     ### W412A replicas next
     # uni_l = []
@@ -137,7 +142,10 @@ def get_fp_dataframe(
         ligand = u.select_atoms(ligname)
         protein = u.select_atoms("protein")
         fp = plf.Fingerprint()
-        fp.run(u.trajectory[::skip], ligand, protein)
+        if skip != 1:
+            fp.run(u.trajectory[::skip], ligand, protein)
+        else:  # MDA does not like if skip == 1 and you don't provide start and stop
+            fp.run(u.trajectory, ligand, protein)
         df = fp.to_dataframe()
         df = df.droplevel(
             "ligand", axis=1
