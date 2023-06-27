@@ -1,14 +1,18 @@
 from typing import Optional
+import os
 import glob
-import MDAnalysis as mda
-import pandas as pd
-import simulation_names as sims
+
 import numpy as np
+import pandas as pd
+import MDAnalysis as mda
 from MDAnalysis.analysis.rms import RMSD
+import prolif as plf
+
+import src.simulation_metadata as sims
 
 
 def load_unis(
-    sim_list: list = [
+    sim_list: list[sims.SimulationMetadata] = [
         sims.PfHT_MMV12,
         sims.W412A_MMV12,
         sims.PfHT_MMV8,
@@ -42,7 +46,8 @@ def load_unis(
     all_uni = {}
     all_lens = {}
 
-    for sim_name, path_name, n_replicas in sim_list:
+    for sim in sim_list:
+        sim_name, path_name, n_replicas = sim.name, sim.path, sim.n_replicas
         uni_list = []
         sim_length_list = []
 
@@ -119,8 +124,6 @@ def get_fp_dataframe(
     If you don't want to perform the calculation, you can set this to "False" and write
     the filename you wish to load
     """
-    import prolif as plf
-    import os
 
     if run_calc:
         ligand = u.select_atoms(ligname)

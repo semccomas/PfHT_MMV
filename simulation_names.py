@@ -1,7 +1,0 @@
-PfHT_MMV12 = ["PfHT_MMV12", "../../EM_MMV/MMV12", 3]
-W412A_MMV12 = ["W412A_MMV12", "../../EM_MMV/W412A_MMV12", 3]
-PfHT_MMV8 = ["PfHT_MMV8", "../../EM_MMV/MMV8", 3]
-GLUT1_MMV12 = ["GLUT1_MMV12", "../../EM_MMV/GLUT1_MMV12", 3]
-PfHT_apo = ["PfHT_apo", "../../EM_MMV/PfHT_apo", 3]
-PfHT_3361_crystal = ["PfHT_3361.crystal", "../../C3361_sims/crystal_str_6m2l", 3]
-PfHT_3361_em = ["PfHT_3361.em", "../../C3361_sims/EM_3361", 3]
