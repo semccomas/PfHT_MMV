@@ -150,9 +150,9 @@ def get_fp_dataframe(
     return df
 
 
-def RMSD_calc(
+def calc_rmsd(
     u: mda.Universe,
-    sim_name,  ## TODO I don't think this is actually a str
+    ref_name,  ## TODO I don't think this is actually a str
     skip: int,
     groupselections: list = ["resname MMV"],
     run_calc: bool = True,
@@ -167,16 +167,17 @@ def RMSD_calc(
 
     Will save an np array for each rmsd individually
     """
-
-    ref = sims.sim_name[2]
+    ref = mda.Universe(ref_name)
 
     R = RMSD(
         u,
         ref,
         select="backbone",  # superimpose on whole backbone of the whole protein
-        groupselections=["resname F00"],
+        groupselections=groupselections,
     )
     R.run()
+
+    return R.results.rmsd
 
 
 '''
