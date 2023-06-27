@@ -3,20 +3,22 @@ import glob
 import MDAnalysis as mda
 import pandas as pd
 import simulation_names as sims
+import numpy as np
+from MDAnalysis.analysis.rms import RMSD
+
 
 def load_unis(
-        sim_list: list=[
-                        sims.PfHT_MMV12,
-                        sims.W412A_MMV12,
-                        sims.PfHT_MMV8,
-                        sims.PfHT_apo,
-                        sims.GLUT1_MMV12,
-                        sims.PfHT_3361_crystal,
-                        sims.PfHT_3361_em                        
-                        ] ,  
-        protonly_or_wholesys: str='protonly'     
+    sim_list: list = [
+        sims.PfHT_MMV12,
+        sims.W412A_MMV12,
+        sims.PfHT_MMV8,
+        sims.PfHT_apo,
+        sims.GLUT1_MMV12,
+        sims.PfHT_3361_crystal,
+        sims.PfHT_3361_em,
+    ],
+    protonly_or_wholesys: str = "protonly",
 ) -> tuple[dict[str, list[mda.Universe]], dict[str, list[int]]]:
-
     """
     will load mda unis of all em analyses so far
     Not so space intensive since I don't save this to memory with mda
@@ -29,10 +31,12 @@ def load_unis(
     for now, protonly and TPR
     which means that numbering is incorrect, you'll have to add 21
 
-    Note that each simulation is a different length. This function will find the longest sim
-    of 0_xxx ns long assuming that naming convention is correct 
+    Note that each simulation is a different length.
+    This function will find the longest sim
+    of 0_xxx ns long assuming that naming convention is correct
 
-    A tuple of dicts is returned, one with {sim_name:mda_uni}, and one with {sim_name, sim_length}
+    A tuple of dicts is returned, one with {sim_name:mda_uni},
+      and one with {sim_name, sim_length}
     """
 
     all_uni = {}
@@ -42,38 +46,52 @@ def load_unis(
         uni_list = []
         sim_length_list = []
 
-        for replica in range(1, n_replicas+1):
-
+        for replica in range(1, n_replicas + 1):
             ####### get filenames
 
             ## first tpr - any protonly is OK
-            if protonly_or_wholesys == 'protonly':
-                tpr_file = glob.glob(f'{path_name}/replica_{replica}/production/*protonly.tpr', recursive=True)
+            if protonly_or_wholesys == "protonly":
+                tpr_file = glob.glob(
+                    f"{path_name}/replica_{replica}/production/*protonly.tpr",
+                    recursive=True,
+                )
             else:
-                tpr_file = glob.glob(f'{path_name}/replica_{replica}/production/*0_200ns.tpr', recursive=True)
+                tpr_file = glob.glob(
+                    f"{path_name}/replica_{replica}/production/*0_200ns.tpr",
+                    recursive=True,
+                )
             if len(tpr_file) == 0:
-                raise FileNotFoundError(f'protonly tpr file missing for {sim_name} rep {replica}')
+                raise FileNotFoundError(
+                    f"protonly tpr file missing\
+                                         for {sim_name} rep {replica}"
+                )
             else:
                 tpr_file = tpr_file[0]
 
             ## next find longest traj file
-            traj_files = glob.glob(f'{path_name}/replica_{replica}/production/*.0_*skip250*{protonly_or_wholesys}.xtc', recursive=True)
+            traj_files = glob.glob(
+                f"{path_name}/replica_{replica}/production/*.0_*skip250*{protonly_or_wholesys}.xtc",
+                recursive=True,
+            )
             max_len = 0
             longest_trajectory = None
             for traj in traj_files:
-                traj_full_name = traj.split('/')[-1] ## full sim name will always be the final name in the path
-                traj_len = int(traj_full_name.split('0_')[1].split('ns')[0])  ## naming convention will always have "0_XXXns", so we can split between these 
-                
-                ## find longest sim length, replace previous until you found maxmimum #. Keep this trajectory as longest_trajectory
+                ## full sim name will always be the final name in the path
+                ## naming convention will always have "0_XXXns",
+                #### so we can split between these
+                traj_full_name = traj.split("/")[-1]
+                traj_len = int(traj_full_name.split("0_")[1].split("ns")[0])
+
+                ## find longest sim length, replace previous until you found maxmimum #
+                # #Keep this trajectory as longest_trajectory
                 if traj_len > max_len:
                     max_len = traj_len
                     longest_trajectory = traj
-            if longest_trajectory == None:
-                raise FileNotFoundError(f'Simulation {sim_name} rep {replica} here is not named correctly. \
-                                        Are you sure you have "protonly" if protonly= {protonly_or_wholesys}?')
-            
-
-
+            if longest_trajectory is None:
+                raise FileNotFoundError(
+                    f'Simulation {sim_name} rep {replica} here is not named correctly. \
+                                        Are you sure you have "protonly" if protonly= {protonly_or_wholesys}?'
+                )
 
             ##### make uni of filenames. Add all reps to this universe list
 
@@ -81,15 +99,11 @@ def load_unis(
             uni_list.append(u)
             sim_length_list.append(len(u.trajectory))
 
-
         ### add to dict
         all_uni[sim_name] = uni_list
         all_lens[sim_name] = sim_length_list
 
     return all_uni, all_lens
-
-
-
 
 
 def get_fp_dataframe(
@@ -136,6 +150,33 @@ def get_fp_dataframe(
     return df
 
 
+def RMSD_calc(
+    u: mda.Universe,
+    sim_name,  ## TODO I don't think this is actually a str
+    skip: int,
+    groupselections: list = ["resname MMV"],
+    run_calc: bool = True,
+    filename: Optional[str] = None,
+) -> np.array:
+    """
+    This will calculate RMSD using MDA
+    It's barely different from the mda tool itself, but
+    here I give the option to save the np array so you can easily call it later
+    The calculation otherwise can take some time
+
+
+    Will save an np array for each rmsd individually
+    """
+
+    ref = sims.sim_name[2]
+
+    R = RMSD(
+        u,
+        ref,
+        select="backbone",  # superimpose on whole backbone of the whole protein
+        groupselections=["resname F00"],
+    )
+    R.run()
 
 
 '''
