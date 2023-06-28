@@ -140,12 +140,12 @@ def get_fp_dataframe(
             "ligand", axis=1
         )  ##no need for keeping ligand axis, everything is MMV
         if filename is not None:
-            pd.to_pickle(df, f"../fingerprints_df/{filename}.pkl")
+            pd.to_pickle(df, f"../../fingerprints_df/{filename}.pkl")
         else:
             print("no filename given, returning dataframe, not saving file...")
     else:
         if filename is not None:
-            df = pd.read_pickle(f"../fingerprints_df/{filename}.pkl")
+            df = pd.read_pickle(f"../../fingerprints_df/{filename}.pkl")
         else:
             raise NameError(
                 f'please provide a filename to load if not running calculation,\
@@ -155,14 +155,14 @@ def get_fp_dataframe(
     return df
 
 
-def mean_intxn_time_dfs_wide(
+def pct_intxn_per_residue_wide(
     intxn_name: str,
     all_fp_dfs: dict[str, list[pd.DataFrame]],
     sims: list[sims.SimulationMetadata],
     mean_cutoff: float = 0.1,
 ) -> pd.DataFrame:
     """
-    Calculates the mean interaction time for a specified interaction type
+    Calculates the percent interaction time for a specified interaction type
     Returns a multilevel dataframe with residue interacting as the index,
       and replica #(python indexed) as the column name, for each condition multi index
       this is in wide format, but we need to be able to keep Nans in place for ensuring
@@ -191,6 +191,54 @@ def mean_intxn_time_dfs_wide(
     all_mean_interactions = pd.concat(all_mean_interactions, axis=1)
 
     return all_mean_interactions
+
+
+def pct_n_intxn_per_frame_wide(
+    intxn_name: str,
+    sims: list[sims.SimulationMetadata],
+    all_fp_dfs: dict[str, list[pd.DataFrame]],
+    percentage: bool = True,
+    value_counts: bool = True,
+) -> pd.DataFrame:
+    """
+    In all dataframes, find the sum across columns for a specific interaction type
+    this will give you the n interactions per frame (since boolean df)
+
+    If value_counts is set to True:
+        will find how many times each column has each n interactions
+        index will become n_interactions
+
+    If percentage is set to True:
+        find % of total simulation time this number occurs
+        by dividing by length of df
+
+
+
+    This will return a dataframe in a wide format, which we can then postprocess later
+    """
+    temp_all = {}
+    for sim in sims:
+        fp_df_l = all_fp_dfs[sim.name]
+        temp_rep = []
+
+        for rep_n, rep_df in enumerate(fp_df_l):
+            n_counts = rep_df.xs(intxn_name, level="interaction", axis=1).sum(axis=1)
+            if value_counts:
+                n_counts = n_counts.value_counts()
+                index_name = "n_interactions"
+            else:
+                index_name = "frame"
+            if percentage:
+                n_counts = n_counts / len(rep_df)
+            n_counts.name = f"replica {rep_n+1}"
+            temp_rep.append(n_counts)
+
+        temp_rep = pd.concat(temp_rep, axis=1)
+        temp_all[sim.name] = temp_rep
+
+    temp_all = pd.concat(temp_all, axis=1)
+    temp_all.index.name = index_name
+    return temp_all
 
 
 def process_wide_df(
