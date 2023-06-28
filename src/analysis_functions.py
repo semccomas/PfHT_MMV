@@ -47,35 +47,32 @@ def load_unis(
     all_lens = {}
 
     for sim in sim_list:
-        sim_name, path_name, n_replicas = sim.name, sim.path, sim.n_replicas
         uni_list = []
         sim_length_list = []
 
-        for replica in range(1, n_replicas + 1):
-            ####### get filenames
-
+        for replica in range(1, sim.n_replicas + 1):
             ## first tpr - any protonly is OK
             if protonly_or_wholesys == "protonly":
                 tpr_file = glob.glob(
-                    f"{path_name}/replica_{replica}/production/*protonly.tpr",
+                    f"{sim.path}/replica_{replica}/production/*protonly.tpr",
                     recursive=True,
                 )
             else:
                 tpr_file = glob.glob(
-                    f"{path_name}/replica_{replica}/production/*0_200ns.tpr",
+                    f"{sim.path}/replica_{replica}/production/*0_200ns.tpr",
                     recursive=True,
                 )
             if len(tpr_file) == 0:
                 raise FileNotFoundError(
                     f"protonly tpr file missing\
-                                         for {sim_name} rep {replica}"
+                                         for {sim.name} rep {replica}"
                 )
             else:
                 tpr_file = tpr_file[0]
 
             ## next find longest traj file
             traj_files = glob.glob(
-                f"{path_name}/replica_{replica}/production/*.0_*skip250*{protonly_or_wholesys}.xtc",
+                f"{sim.path}/replica_{replica}/production/*.0_*skip250*{protonly_or_wholesys}.xtc",
                 recursive=True,
             )
             max_len = 0
@@ -94,8 +91,8 @@ def load_unis(
                     longest_trajectory = traj
             if longest_trajectory is None:
                 raise FileNotFoundError(
-                    f'Simulation {sim_name} rep {replica} here is not named correctly. \
-                                        Are you sure you have "protonly" if protonly= {protonly_or_wholesys}?'
+                    f'Simulation {sim.name} rep {replica} here is not named correctly. \
+                Are you sure you have "protonly" if protonly= {protonly_or_wholesys}?'
                 )
 
             ##### make uni of filenames. Add all reps to this universe list
@@ -105,10 +102,15 @@ def load_unis(
             sim_length_list.append(len(u.trajectory))
 
         ### add to dict
-        all_uni[sim_name] = uni_list
-        all_lens[sim_name] = sim_length_list
+        all_uni[sim.name] = uni_list
+        all_lens[sim.name] = sim_length_list
 
     return all_uni, all_lens
+
+
+#######################################################
+##### PROLIF FINGERPRINTING FUNCTIONS ##################
+#######################################################
 
 
 def get_fp_dataframe(
@@ -151,6 +153,116 @@ def get_fp_dataframe(
             )
             # print(os.listdir('../fingerprints_df'))
     return df
+
+
+def mean_intxn_time_dfs_wide(
+    intxn_name: str,
+    all_fp_dfs: dict[str, list[pd.DataFrame]],
+    sims: list[sims.SimulationMetadata],
+    mean_cutoff: float = 0.1,
+) -> pd.DataFrame:
+    """
+    Calculates the mean interaction time for a specified interaction type
+    Returns a multilevel dataframe with residue interacting as the index,
+      and replica #(python indexed) as the column name, for each condition multi index
+      this is in wide format, but we need to be able to keep Nans in place for ensuring
+      that zeros are counted
+
+      intxn_name should be HBAcceptor, HBDonor, Hydrophobic, PiStacking generally
+
+      Different use cases:
+      Comparing all PfHT simulations:
+            Intention is therefore to drop GLUT1 from this dataframe
+            and then melt along residues to get a long form dataframe
+    """
+    all_mean_interactions = {}
+    for sim in sims:
+        replica_names = [f"replica {i}" for i in range(1, sim.n_replicas + 1)]
+
+        mean_intxn_all_reps = []
+        for rep in all_fp_dfs[sim.name]:
+            intxn_group_over_time = rep.xs(intxn_name, level="interaction", axis=1)
+            mean_intxn = intxn_group_over_time.mean()
+            mean_intxn = mean_intxn.loc[mean_intxn > mean_cutoff]
+            mean_intxn_all_reps.append(mean_intxn)
+        mean_intxn_all_reps = pd.concat(mean_intxn_all_reps, axis=1, keys=replica_names)
+        all_mean_interactions[sim.name] = mean_intxn_all_reps
+
+    all_mean_interactions = pd.concat(all_mean_interactions, axis=1)
+
+    return all_mean_interactions
+
+
+def process_wide_df(
+    df: pd.DataFrame,
+    index_col_name: str,
+    condition_to_remove: Optional[str] = None,
+    index_name: str = "index",
+    top_level_melt_name: str = "protein",
+    lower_level_melt_name: str = "replica",
+    add_21: bool = False,
+) -> pd.DataFrame:
+    """
+    Wide multi index dataframe as input with the following format:
+    eventual label as index (ie residue name)
+    condition name as top label
+    replica name as under label
+    This isn't strictly necessary but it is designed this way because
+    other functions make dataframes like this
+    ie:
+    index:              PfHT_MMV12     ... GLUT1_MMV12
+            replica 1:   replica 2:         replica 3:
+    GLN104     value1       value3            value500
+    ASP205     value2       value4
+
+    is a typical format for input
+    and output will be like:
+           value:     replica:   protein:    residue:
+    0      value1     replica1    PfHT_MMV12   GLN104
+    1      value3     replica2    PfHT_MMV12   GLN104
+    ...
+    20     value2     replica3   PfHT_MMV12   ASP205
+
+
+    will melt array and rename the index to the variable 'index_col_name'
+    (this might be residue, n_interactions...). If index is from prolif
+    directly, it's probably named "protein"
+
+
+    """
+    ## sometimes there might be values specific only to the
+    ### condition you want to remove, so drop these from the dataframe
+    if condition_to_remove is not None:
+        del df[condition_to_remove]
+        df = df.dropna(how="all", axis=0)
+
+    ## for the melting, if you have gathered replicas together, and then
+    #### gathered conditions on top of that (as is often the structure of other
+    ##### functions of this script), the top_level_melt_name is usually 'protein'
+    ###### and lower_level_melt_name is 'residue'
+    df = (
+        df.fillna(0.0)
+        .reset_index()
+        .rename({index_name: index_col_name}, axis=1)
+        .melt(
+            id_vars=[index_col_name],
+            var_name=[top_level_melt_name, lower_level_melt_name],
+        )
+    )
+
+    ### finally, add 21 to res numbers
+    ## TODO - conditional if PfHT
+    if add_21:
+        df["resnr"] = df["residue"].str[3:].astype(int) + 21
+        df["residue"] = df["residue"].str[:3] + df["resnr"].astype(str)
+        del df["resnr"]
+
+    return df
+
+
+###################################################
+############### MD analysis things #################
+####################################################
 
 
 def calc_rmsd(
