@@ -140,16 +140,19 @@ def get_fp_dataframe(
             "ligand", axis=1
         )  ##no need for keeping ligand axis, everything is MMV
         if filename is not None:
-            pd.to_pickle(df, f"../../fingerprints_df/{filename}.pkl")
+            pd.to_pickle(df, f"/data/PfHT_MMV/analysis/fingerprints_df/{filename}.pkl")
         else:
             print("no filename given, returning dataframe, not saving file...")
     else:
         if filename is not None:
-            df = pd.read_pickle(f"../../fingerprints_df/{filename}.pkl")
+            df = pd.read_pickle(
+                f"/data/PfHT_MMV/analysis/fingerprints_df/{filename}.pkl"
+            )
         else:
             raise NameError(
                 f'please provide a filename to load if not running calculation,\
-                            possibly: {os.listdir("../fingerprints_df")}'
+                            possibly:\
+                     {os.listdir("/data/PfHT_MMV/analysis/fingerprints_df")}'
             )
             # print(os.listdir('../fingerprints_df'))
     return df
@@ -239,6 +242,73 @@ def pct_n_intxn_per_frame_wide(
     temp_all = pd.concat(temp_all, axis=1)
     temp_all.index.name = index_name
     return temp_all
+
+
+def res_intxn_over_time_plf(
+    df_l: list[pd.DataFrame],
+    df_names: list[str],
+    resname: str,
+    subtract_num: int = 21,  # PfHT numbering, may need another # for gluts or whatever
+) -> tuple[pd.DataFrame, dict]:
+    """
+    Takes a list of dataframes
+    of prolif fingerprint as input
+
+    PfHT_num assumes that you have to subtract 21 from the res number
+    provided
+
+    melts dataframe on "Frame", and replaces "False" with np.nan
+    so that plotting is easier
+    Returns a longform dataframe with colums:
+    Frame, interaction, value, and interaction_loc
+
+
+        ############### FOR DISPLACING ON SEABORN ################
+     setting y='original_df' etc will mean that all values overlap
+     therefore, we give the y value as a number (based on interaction type, so that
+     each y is separated)
+     then, we also give each dataframe that went into this function a number,
+       which we will
+     use to "jitter" the plot a bit, so that you don't have all data points overlapping
+
+    interaction_loc is a handy way to toggle sns scatterplot so that you can show
+    distributions side by side
+    """
+
+    resname = resname[:3] + str(int(resname[3:]) - subtract_num)
+
+    ### make dataframe longform, replace all False with nan
+    intxn_possibilities = []
+    new_df_l = []
+    for df in df_l:
+        df = df[resname]
+        intxn_possibilities.extend(df.columns)
+        new_df_l.append(df)
+
+    df = pd.concat(new_df_l, axis=1, keys=df_names)
+    df = df.reset_index().melt(
+        id_vars=["Frame"], var_name=["original_df", "interaction"]
+    )
+    # df['value']= df['value'].replace(False, np.nan)
+
+    #### SEABORN DISPLACEMENT THINGS ###
+    ## for displacing y on seaborn plot, we need to have the locations for the
+    #### interaction type
+    intxn_name_dict = {}
+    intxn_possibilities = set(intxn_possibilities)
+    for n, interaction in enumerate(intxn_possibilities):
+        intxn_name_dict[interaction] = n + 1
+    df["interaction_loc"] = df["interaction"].replace(intxn_name_dict)
+
+    ## also for displacing, need to know how much to displace by,
+    # # which we should dictate based
+    #### on dataframe name (so each displacement is the same)
+    df_name_dict = {}
+    for n, df_name in enumerate(df_names):
+        df_name_dict[df_name] = n + 1
+    df["original_df_name_loc"] = df["original_df"].replace(df_name_dict)
+
+    return df, intxn_name_dict
 
 
 def process_wide_df(
