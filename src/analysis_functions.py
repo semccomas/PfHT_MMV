@@ -11,16 +11,45 @@ import prolif as plf
 import src.simulation_metadata as sims
 
 
+def load_unis_marta(
+    sim_list: list[sims.SimulationMetadata],
+    filename_xtc: str,
+    filename_tpr: Optional[str] = None,
+) -> tuple[dict[str, list[mda.Universe]], dict[str, list[int]]]:
+    """
+    same as below, load mda universes of  each replica
+    return tuple of two dicts
+    dict 1 = all_unis, key=sim.name, value = list as long as n replicas of unis
+    of mda unis
+    dict2 = all_lens, key=sim.name, value=list as long as n replicas of unis
+    of lengths of unis
+
+    This assumes that the filenames are always the same for each condition
+    besides the replica #
+    """
+    all_uni = {}
+    all_lens = {}
+
+    for sim in sim_list:
+        uni_list = []
+        sim_length_list = []
+
+        for replica in range(1, sim.n_replicas + 1):
+            tpr = f"{sim.path}/rep{replica}.prot.tpr"
+            xtc = f"{sim.path}/{filename_xtc}.{replica}.skip250.xtc"
+
+            u = mda.Universe(tpr, xtc)
+            uni_list.append(u)
+            sim_length_list.append(len(u.trajectory))
+
+        all_uni[sim.name] = uni_list
+        all_lens[sim.name] = sim_length_list
+
+    return all_uni, all_lens
+
+
 def load_unis(
-    sim_list: list[sims.SimulationMetadata] = [
-        sims.PfHT_MMV12,
-        sims.W412A_MMV12,
-        sims.PfHT_MMV8,
-        sims.PfHT_apo,
-        sims.GLUT1_MMV12,
-        sims.PfHT_3361_crystal,
-        sims.PfHT_3361_em,
-    ],
+    sim_list: list[sims.SimulationMetadata],
     protonly_or_wholesys: str = "protonly",
 ) -> tuple[dict[str, list[mda.Universe]], dict[str, list[int]]]:
     """
@@ -62,6 +91,7 @@ def load_unis(
                     f"{sim.path}/replica_{replica}/production/*0_200ns.tpr",
                     recursive=True,
                 )
+
             if len(tpr_file) == 0:
                 raise FileNotFoundError(
                     f"protonly tpr file missing\
@@ -116,9 +146,10 @@ def load_unis(
 def get_fp_dataframe(
     u: mda.Universe,
     skip: int,
-    ligname: str = "resname MMV",
+    ligname: str,
     run_calc: bool = True,
     filename: Optional[str] = None,
+    filename_path: Optional[str] = "/data/PfHT_MMV/analysis/fingerprints_df",
 ) -> pd.DataFrame:
     """
     Here I just run prolif fingerprints on a uni
@@ -140,19 +171,17 @@ def get_fp_dataframe(
             "ligand", axis=1
         )  ##no need for keeping ligand axis, everything is MMV
         if filename is not None:
-            pd.to_pickle(df, f"/data/PfHT_MMV/analysis/fingerprints_df/{filename}.pkl")
+            pd.to_pickle(df, f"{filename_path}/{filename}.pkl")
         else:
             print("no filename given, returning dataframe, not saving file...")
     else:
         if filename is not None:
-            df = pd.read_pickle(
-                f"/data/PfHT_MMV/analysis/fingerprints_df/{filename}.pkl"
-            )
+            df = pd.read_pickle(f"{filename_path}/{filename}.pkl")
         else:
             raise NameError(
                 f'please provide a filename to load if not running calculation,\
                             possibly:\
-                     {os.listdir("/data/PfHT_MMV/analysis/fingerprints_df")}'
+                     {os.listdir(f"{filename_path}")}'
             )
             # print(os.listdir('../fingerprints_df'))
     return df

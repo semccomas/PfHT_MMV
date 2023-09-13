@@ -13,10 +13,19 @@ class SimulationMetadata:
     path: str
     n_replicas: int
     color: str
-    ref_path: str
-    ligname: Optional[str] = None
-    protein: Optional[str] = None
+    ref_path: Optional[str] = None  # this is a gro file for RMSD calculation
+    ligname: Optional[str] = None  # this is ligname in mda Uni file
+    protein: Optional[str] = "PfHT1"  # this is for some res# dicts later on
 
+
+PfHT_bf1_tosh = SimulationMetadata(
+    name="PfHT_TOSH",
+    path="/data/PfHT_MMV/analysis/mnt_marta",
+    n_replicas=5,
+    color="blue",
+    protein="PfHT1",
+    ligname="LIG",
+)
 
 PfHT_MMV12 = SimulationMetadata(
     name="PfHT_MMV12",
@@ -31,7 +40,7 @@ W412A_MMV12 = SimulationMetadata(
     name="W412A_MMV12",
     path="/data/PfHT_MMV/EM_MMV/W412A_MMV12",
     n_replicas=3,
-    color="#37456d",
+    color="#F2B705",
     protein="PfHT1",
     ref_path="",
 )
@@ -39,7 +48,7 @@ PfHT_MMV8 = SimulationMetadata(
     name="PfHT_MMV8",
     path="/data/PfHT_MMV/EM_MMV/MMV8",
     n_replicas=3,
-    color="#E27439",
+    color="#84B3BB",
     protein="PfHT1",
     ref_path="",
 )
@@ -47,9 +56,10 @@ GLUT1_MMV12 = SimulationMetadata(
     name="GLUT1_MMV12",
     path="/data/PfHT_MMV/EM_MMV/GLUT1_MMV12",
     n_replicas=3,
-    color="grey",
+    color="#BCBCBC",
     protein="GLUT1",
-    ref_path="",
+    ligname="MMV",
+    ref_path="/data/PfHT_MMV/EM_MMV/GLUT1_MMV12/replica_1/production/GLUT1_MMV12.em.1.start.protonly.gro",
 )
 PfHT_apo = SimulationMetadata(
     name="PfHT_apo",
@@ -63,17 +73,19 @@ PfHT_3361_crystal = SimulationMetadata(
     name="PfHT_3361.crystal",
     path="/data/PfHT_MMV/C3361_sims/crystal_str_6m2l",
     n_replicas=3,
-    color="green",
+    color="grey",
     protein="PfHT1",
-    ref_path="",
+    ref_path="/data/PfHT_MMV/C3361_sims/crystal_str_6m2l/replica_1/production/PfHT_3361.crystal.1.start.protonly.gro",
+    ligname="F00",
 )
 PfHT_3361_em = SimulationMetadata(
     name="PfHT_3361.em",
     path="/data/PfHT_MMV/C3361_sims/EM_3361",
     n_replicas=3,
-    color="red",
+    color="#ED91B8",
     protein="PfHT1",
-    ref_path="",
+    ref_path="/data/PfHT_MMV/C3361_sims/EM_3361/replica_1/production/PfHT_3361.em.1.start.protonly.gro",
+    ligname="F00",
 )
 PfHT_MMV_crystal = SimulationMetadata(
     name="PfHT_MMV_crystal",
