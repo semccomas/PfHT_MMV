@@ -1,2 +1,5 @@
 .ruff_cache/
+.conda
+.ipynb_checkpoints
+.vscode
 __pycache__/
